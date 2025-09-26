@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 import bcrypt
 from db import init_db, get_db_connection
 
+
 init_db()
+
 
 st.set_page_config(page_title="Maximum Effort Fitness Tracker", layout="centered")
 
@@ -102,4 +104,25 @@ if not workouts.empty:
     st.pyplot(fig)
 else:
     st.info("Log some workouts to see your progress!")
+
+import streamlit as st
+
+# Hide default footer
+hide_footer = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_footer, unsafe_allow_html=True)
+
+# Add custom logo with Streamlit's built-in function
+st.markdown("<br><br>", unsafe_allow_html=True)  # add spacing
+st.image("images/logo.png", width=120)
+st.markdown(
+    "<p style='text-align: center; font-size:14px; color:gray;'>Maximum Effort Strength & Conditioning</p>",
+    unsafe_allow_html=True
+)
+
 
