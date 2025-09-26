@@ -1,0 +1,12 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore venv
+venv/
+
+# Ignore local DB file
+fitness.db
+
+# Ignore Mac system files
+.DS_Store
