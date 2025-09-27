@@ -4,17 +4,21 @@ import matplotlib.pyplot as plt
 import bcrypt
 from db import init_db, get_db_connection
 
-
+# ---------------------------
+# INIT
+# ---------------------------
 init_db()
-
-
 st.set_page_config(page_title="Maximum Effort Fitness Tracker", layout="centered")
 
-# ---- Title ----
+# ---------------------------
+# TITLE
+# ---------------------------
 st.title("💪 Maximum Effort Fitness Tracker")
 st.write("Track your workouts, see progress, and stay consistent.")
 
-# ---- Registration ----
+# ---------------------------
+# REGISTRATION
+# ---------------------------
 st.subheader("Register New Account")
 new_username = st.text_input("New Username")
 new_password = st.text_input("New Password", type="password")
@@ -23,7 +27,10 @@ if st.button("Register"):
         hashed_pw = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt())
         try:
             conn = get_db_connection()
-            conn.execute("INSERT INTO users (username, password) VALUES (?, ?)", (new_username, hashed_pw))
+            conn.execute(
+                "INSERT INTO users (username, password) VALUES (?, ?)", 
+                (new_username, hashed_pw)
+            )
             conn.commit()
             conn.close()
             st.success("Account created! You can now log in.")
@@ -32,9 +39,9 @@ if st.button("Register"):
     else:
         st.error("Please enter both username and password.")
 
-
-
-# ---- Login ----
+# ---------------------------
+# LOGIN
+# ---------------------------
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -52,15 +59,18 @@ if not st.session_state.user:
         else:
             st.error("Invalid login")
     st.stop()
-# ---- Logout ----
+
+# ---------------------------
+# LOGOUT
+# ---------------------------
 if st.session_state.user:
     if st.button("Logout"):
         st.session_state.user = None
         st.experimental_rerun()
 
-
-
-# ---- Workout Form ----
+# ---------------------------
+# ADD WORKOUT
+# ---------------------------
 st.subheader("Add a Workout")
 with st.form("workout_form"):
     date = st.date_input("Date")
@@ -79,35 +89,67 @@ with st.form("workout_form"):
         conn.commit()
         conn.close()
         st.success("Workout added!")
+        st.cache_data.clear()  # ensure workout log refreshes instantly
 
-# ---- Show Log ----
+# ---------------------------
+# WORKOUT LOG
+# ---------------------------
 st.subheader("Workout Log")
-conn = get_db_connection()
-workouts = pd.read_sql_query(
-    "SELECT date, exercise, sets, reps, weight FROM workouts WHERE user = ? ORDER BY date DESC",
-    conn,
-    params=(st.session_state.user,),
-)
-conn.close()
+
+@st.cache_data
+def load_workouts(user):
+    conn = get_db_connection()
+    df = pd.read_sql_query(
+        "SELECT date, exercise, sets, reps, weight FROM workouts WHERE user = ? ORDER BY date DESC",
+        conn,
+        params=(user,),
+    )
+    conn.close()
+    return df
+
+workouts = load_workouts(st.session_state.user)
 st.dataframe(workouts)
 
-
-# ---- Progress Tracking ----
+# ---------------------------
+# PROGRESS TRACKING
+# ---------------------------
 st.subheader("Progress Over Time")
+
 if not workouts.empty:
+    # Calculate tonnage (sets x reps x weight)
     workouts["Volume"] = workouts["sets"] * workouts["reps"] * workouts["weight"]
 
-    fig, ax = plt.subplots()
-    workouts.groupby("date")["Volume"].sum().plot(ax=ax, marker="o")
-    ax.set_ylabel("Total Volume (lbs)")
-    ax.set_title(f"Training Volume Over Time – {st.session_state.user}")
-    st.pyplot(fig)
+    # Epley 1RM formula
+    workouts["Estimated_1RM"] = workouts["weight"] * (1 + workouts["reps"] / 30)
+
+    # Chart: Total volume per day
+    @st.cache_data
+    def make_volume_chart(df, user):
+        fig, ax = plt.subplots()
+        df.groupby("date")["Volume"].sum().plot(ax=ax, marker="o")
+        ax.set_ylabel("Total Volume (lbs)")
+        ax.set_title(f"Training Volume Over Time – {user}")
+        return fig
+
+    st.pyplot(make_volume_chart(workouts, st.session_state.user))
+
+    # Chart: Estimated 1RM per exercise
+    @st.cache_data
+    def make_1rm_chart(df):
+        fig, ax = plt.subplots()
+        df.groupby("exercise")["Estimated_1RM"].max().plot(kind="bar", ax=ax)
+        ax.set_ylabel("Estimated 1RM (lbs)")
+        ax.set_title("Best Estimated 1RM per Exercise")
+        return fig
+
+    st.pyplot(make_1rm_chart(workouts))
+
 else:
     st.info("Log some workouts to see your progress!")
 
-import streamlit as st
-
-# Hide default footer
+# ---------------------------
+# CUSTOM FOOTER + LOGO
+# ---------------------------
 hide_footer = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -117,12 +159,12 @@ hide_footer = """
 """
 st.markdown(hide_footer, unsafe_allow_html=True)
 
-# Add custom logo with Streamlit's built-in function
-st.markdown("<br><br>", unsafe_allow_html=True)  # add spacing
+st.markdown("<br><br>", unsafe_allow_html=True)  # spacing
 st.image("images/logo.png", width=120)
 st.markdown(
     "<p style='text-align: center; font-size:14px; color:gray;'>Maximum Effort Strength & Conditioning</p>",
     unsafe_allow_html=True
 )
+
 
 
